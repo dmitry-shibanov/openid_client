@@ -183,18 +183,22 @@ class Credential {
     return new UserInfo.fromJson(await _get(uri));
   }
 
-  Future _get(uri) async {
-    if (_token.accessToken == null) {
+  Future refresh() async {
       var json = await http.post(client.issuer.metadata.tokenEndpoint, body: {
         "grant_type": "refresh_token",
         "refresh_token": _token.refreshToken,
         "client_id": client.clientId,
+        "client_secret": client.clientSecret,
       });
       if (json["error"] != null) {
-        throw new Exception(json["error_description"]);
+        throw new Exception(json["error_description"] ?? json["error"]);
       }
-
       _token = new TokenResponse.fromJson(json);
+  }
+
+  Future _get(uri) async {
+    if (_token.accessToken == null) {
+      await refresh();
     }
     if (_token.tokenType != null && _token.tokenType.toLowerCase() != "bearer")
       throw new UnsupportedError("Unknown token type: ${_token.tokenType}");
@@ -225,7 +229,7 @@ class Credential {
   String get refreshToken => _token.refreshToken;
 }
 
-enum FlowType { implicit, authorizationCode, proofKeyForCodeExchange }
+enum FlowType { implicit, authorizationCode, proofKeyForCodeExchange, hybrid }
 
 class Flow {
   final FlowType type;
@@ -274,6 +278,9 @@ class Flow {
                 client.issuer.metadata.responseTypesSupported.contains(v)),
             client,
             state: state);
+
+  Flow.hybrid(Client client, {String state})
+      : this._(FlowType.hybrid, "code id_token", client, state: state);
 
   Uri get authenticationUri => client.issuer.metadata.authorizationEndpoint
       .replace(queryParameters: _authenticationUriParameters);
@@ -334,7 +341,7 @@ class Flow {
       throw new UnsupportedError("Unknown auth methods: $methods");
     }
     if (json["error"] != null) {
-      throw new Exception(json["error_description"]);
+      throw new Exception(json["error_description"] ?? json["error"]);
     }
     return new TokenResponse.fromJson(json);
   }

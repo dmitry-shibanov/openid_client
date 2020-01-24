@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Fix credential refresh without client secret
+
 ## 0.3.0
 
 - Add hybrid flow
